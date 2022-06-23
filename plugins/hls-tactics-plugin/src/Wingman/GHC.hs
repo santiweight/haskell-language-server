@@ -225,6 +225,14 @@ pattern UnguardedRHSs
 pattern UnguardedRHSs body <-
   GRHSs {grhssGRHSs = [L _ (GRHS _ [] body)]}
 
+------------------------------------------------------------------------------
+-- | A GRHS that caontains no guards.
+pattern UnguardedRHSsTc
+  :: LHsExpr GhcTc -> (GRHSs GhcTc (LHsExpr GhcTc))
+pattern UnguardedRHSsTc body <-
+  GRHSs {grhssGRHSs = [L _ (GRHS _ [] body)]}
+
+
 
 ------------------------------------------------------------------------------
 -- | A match with a single pattern. Case matches are always 'SinglePatMatch'es.
@@ -233,6 +241,15 @@ pattern SinglePatMatch pat body <-
   Match { m_pats = [fromPatCompat -> pat]
         , m_grhss = UnguardedRHSs body
         }
+
+------------------------------------------------------------------------------
+-- | A match with a single pattern. Case matches are always 'SinglePatMatch'es.
+pattern SinglePatMatchTc :: Pat GhcTc -> LHsExpr GhcTc -> Match GhcTc (LHsExpr GhcTc)
+pattern SinglePatMatchTc pat body <-
+  Match { m_pats = [fromPatCompat -> pat]
+        , m_grhss = UnguardedRHSsTc body
+        }
+
 
 
 ------------------------------------------------------------------------------
@@ -243,6 +260,15 @@ unpackMatches (SinglePatMatch pat body : matches) =
   ((pat, body):) <$> unpackMatches matches
 unpackMatches _ = Nothing
 
+------------------------------------------------------------------------------
+-- | Helper function for defining the 'Case' pattern.
+unpackMatchesTc :: [Match GhcTc (LHsExpr GhcTc)] -> Maybe [(Pat GhcTc, LHsExpr GhcTc)]
+unpackMatchesTc [] = Just []
+unpackMatchesTc (SinglePatMatchTc pat body : matches) =
+  ((pat, body):) <$> unpackMatchesTc matches
+unpackMatchesTc _ = Nothing
+
+
 
 ------------------------------------------------------------------------------
 -- | A pattern over the otherwise (extremely) messy AST for lambdas.
@@ -250,6 +276,13 @@ pattern Case :: HsExpr GhcPs -> [(Pat GhcPs, LHsExpr GhcPs)] -> HsExpr GhcPs
 pattern Case scrutinee matches <-
   HsCase _ (L _ scrutinee)
     MG {mg_alts = L _ (fmap unLoc -> unpackMatches -> Just matches)}
+
+------------------------------------------------------------------------------
+-- | A pattern over the otherwise (extremely) messy AST for lambdas.
+pattern CaseTc :: HsExpr GhcTc -> [(Pat GhcTc, LHsExpr GhcTc)] -> HsExpr GhcTc
+pattern CaseTc scrutinee matches <-
+  HsCase _ (L _ scrutinee)
+    MG {mg_alts = L _ (fmap unLoc -> unpackMatchesTc -> Just matches)}
 
 ------------------------------------------------------------------------------
 -- | Like 'Case', but for lambda cases.

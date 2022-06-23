@@ -28,6 +28,7 @@ import           Wingman.Types
 
 #if __GLASGOW_HASKELL__ >= 900
 import GHC.Tc.Utils.TcType
+import GHC (SrcSpanAnn'(..))
 #endif
 
 
@@ -177,10 +178,10 @@ excludeForbiddenMethods = filter (not . flip S.member forbiddenMethods . hi_name
 -- | Extract evidence from 'AbsBinds' in scope.
 absBinds ::  SrcSpan -> LHsBindLR GhcTc GhcTc -> [PredType]
 #if __GLASGOW_HASKELL__ >= 900
-absBinds dst (L src (FunBind w _ _ _))
+absBinds dst (L (SrcSpanAnn _ src) (FunBind w _ _ _))
   | dst `isSubspanOf` src
   = wrapper w
-absBinds dst (L src (AbsBinds _ _ h _ _ z _))
+absBinds dst (L (SrcSpanAnn _ src) (AbsBinds _ _ h _ _ z _))
 #else
 absBinds dst (L src (AbsBinds _ _ h _ _ _ _))
 #endif
@@ -196,7 +197,7 @@ absBinds _ _ = []
 -- | Extract evidence from 'HsWrapper's in scope
 wrapperBinds ::  SrcSpan -> LHsExpr GhcTc -> [PredType]
 #if __GLASGOW_HASKELL__ >= 900
-wrapperBinds dst (L src (XExpr (WrapExpr (HsWrap h _))))
+wrapperBinds dst (L (SrcSpanAnn _ src) (XExpr (WrapExpr (HsWrap h _))))
 #else
 wrapperBinds dst (L src (HsWrap _ h _))
 #endif
@@ -208,7 +209,7 @@ wrapperBinds _ _ = []
 ------------------------------------------------------------------------------
 -- | Extract evidence from the 'ConPatOut's bound in this 'Match'.
 matchBinds :: SrcSpan -> LMatch GhcTc (LHsExpr GhcTc) -> [PredType]
-matchBinds dst (L src (Match _ _ pats _))
+matchBinds dst (L (SrcSpanAnn _ src) (Match _ _ pats _))
   | dst `isSubspanOf` src
   = everything (<>) (mkQ mempty patBinds) pats
 matchBinds _ _ = []

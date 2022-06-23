@@ -60,11 +60,11 @@ pattern MetaprogramSourceText :: SourceText
 pattern MetaprogramSourceText = SourceText "wingman-meta-program"
 
 
-pattern WingmanMetaprogram :: (XRec p (HsExpr p) ~ GenLocated l (HsExpr p)) => FastString -> HsExpr p
+pattern WingmanMetaprogram :: FastString -> HsExpr GhcTc
 pattern WingmanMetaprogram mp <-
 #if __GLASGOW_HASKELL__ >= 900
-  HsPragE _ (HsPragSCC _ MetaprogramSourceText (StringLiteral NoSourceText mp Nothing))
-      (L _ ( HsVar _ _))
+  (HsPragE _ (HsPragSCC _ MetaprogramSourceText (StringLiteral NoSourceText mp Nothing))
+      (L _ ( HsVar _ _)))
 #else
   HsSCC _ MetaprogramSourceText (StringLiteral NoSourceText mp)
       (L _ ( HsVar _ _))

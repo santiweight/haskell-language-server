@@ -320,16 +320,16 @@ globalHoleRef :: IORef Int
 globalHoleRef = unsafePerformIO $ newIORef 10
 {-# NOINLINE globalHoleRef #-}
 
--- instance MonadExtract Int (Synthesized (LHsExpr GhcPs)) TacticError TacticState ExtractM where
---   hole = do
---     u <- lift $ ExtractM $ lift $
---           readIORef globalHoleRef <* modifyIORef' globalHoleRef (+ 1)
---     pure
---       ( u
---       , pure . noLoc $ var $ fromString $ occNameString $ occName $ mkMetaHoleName u
---       )
+instance MonadExtract Int (Synthesized (GenLocated SrcSpanAnnA (HsExpr GhcPs))) TacticError TacticState ExtractM where
+  hole = do
+    u <- lift $ ExtractM $ lift $
+          readIORef globalHoleRef <* modifyIORef' globalHoleRef (+ 1)
+    pure
+      ( u
+      , pure . noLocA $ var $ fromString $ occNameString $ occName $ mkMetaHoleName u
+      )
 
---   unsolvableHole _ = hole
+  unsolvableHole _ = hole
 
 
 instance MonadReader r m => MonadReader r (TacticT jdg ext err s m) where

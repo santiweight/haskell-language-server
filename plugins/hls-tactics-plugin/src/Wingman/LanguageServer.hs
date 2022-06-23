@@ -46,7 +46,7 @@ import qualified Ide.Plugin.Config as Plugin
 import           Ide.Plugin.Properties
 import           Ide.PluginUtils (usePropertyLsp)
 import           Ide.Types (PluginId)
-import           Language.Haskell.GHC.ExactPrint (Transform, modifyAnnsT, addAnnotationsForPretty)
+import           Language.Haskell.GHC.ExactPrint (Transform)
 import           Language.LSP.Server (MonadLsp, sendNotification)
 import           Language.LSP.Types              hiding
                                                  (SemanticTokenAbsolute (length, line),
@@ -65,14 +65,15 @@ import           Wingman.StaticPlugin (pattern WingmanMetaprogram, pattern Metap
 import           Wingman.Types
 import Development.IDE.Types.Logger (Recorder, cmapWithPrio, WithPriority, Pretty (pretty))
 import qualified Development.IDE.Core.Shake as Shake
+import GHC (SrcSpanAnn'(..))
 
 
-newtype Log 
+newtype Log
   = LogShake Shake.Log
   deriving Show
 
 instance Pretty Log where
-  pretty = \case 
+  pretty = \case
     LogShake shakeLog -> pretty shakeLog
 
 tacticDesc :: T.Text -> T.Text
@@ -310,7 +311,7 @@ getAlreadyDestructed
 getAlreadyDestructed (unTrack -> span) (unTrack -> binds) =
   everythingContaining span
     (mkQ mempty $ \case
-      Case (HsVar _ (L _ (occName -> var))) _ ->
+      CaseTc (HsVar _ (L _ (occName -> var))) _ ->
         S.singleton var
       (_ :: HsExpr GhcTc) -> mempty
     ) binds
@@ -360,7 +361,7 @@ getRhsPosVals
 getRhsPosVals (unTrack -> rss) (unTrack -> tcs)
   = everything (<>) (mkQ mempty $ \case
       TopLevelRHS name ps
-          (L (RealSrcSpan span _)  -- body with no guards and a single defn
+          (L (SrcSpanAnn _ (RealSrcSpan span _))  -- body with no guards and a single defn
             (HsVar _ (L _ hole)))
           _
         | containsSpan rss span  -- which contains our span
@@ -418,7 +419,7 @@ buildPatHy prov (fromPatCompat -> p0) =
     ConPatOut {pat_con = (L _ con), pat_arg_tys = args, pat_args = f} ->
 #endif
       case f of
-        PrefixCon l_pgt ->
+        PrefixCon _ l_pgt ->
           mkDerivedConHypothesis prov con args $ zip [0..] l_pgt
         InfixCon pgt pgt5 ->
           mkDerivedConHypothesis prov con args $ zip [0..] [pgt, pgt5]
@@ -445,7 +446,7 @@ mkDerivedRecordHypothesis prov dc args (HsRecFields (fmap unLoc -> fs) _)
   | Just rec_fields <- getRecordFields dc
   = do
     let field_lookup = M.fromList $ zip (fmap (occNameFS . fst) rec_fields) [0..]
-    mkDerivedConHypothesis prov dc args $ fs <&> \(HsRecField (L _ rec_occ) p _) ->
+    mkDerivedConHypothesis prov dc args $ fs <&> \(HsRecField _ (L _ rec_occ) p _) ->
       ( field_lookup M.! (occNameFS $ occName $ unLoc $ rdrNameFieldOcc rec_occ)
       , p
       )
@@ -520,7 +521,7 @@ isRhsHoleWithoutWhere
 isRhsHoleWithoutWhere (unTrack -> rss) (unTrack -> tcs) =
   everything (||) (mkQ False $ \case
       TopLevelRHS _ _
-          (L (RealSrcSpan span _) _)
+          (L (SrcSpanAnn _ (RealSrcSpan span _)) _)
           (EmptyLocalBinds _) -> containsSpan rss span
       _                       -> False
     ) tcs
@@ -574,18 +575,18 @@ wingmanRules recorder plId = do
                 holes =
                   everything (<>)
                     (mkQ mempty $ \case
-                      L span (HsVar _ (L _ name))
+                      L (SrcSpanAnn _ span) (HsVar _ (L _ name))
                         | isHole (occName name) ->
                             maybeToList $ srcSpanToRange span
 #if __GLASGOW_HASKELL__ >= 900
-                      L span (HsUnboundVar _ occ)
+                      L (SrcSpanAnn _ span) (HsUnboundVar _ occ)
 #else
-                      L span (HsUnboundVar _ (TrueExprHole occ))
+                      L (SrcSpanAnn _ span) (HsUnboundVar _ (TrueExprHole occ))
 #endif
                         | isHole occ ->
                             maybeToList $ srcSpanToRange span
 #if __GLASGOW_HASKELL__ <= 808
-                      L span (EWildPat _) ->
+                      L (SrcSpanAnn _ span) (EWildPat _) ->
                         maybeToList $ srcSpanToRange span
 #endif
                       (_ :: LHsExpr GhcPs) -> mempty

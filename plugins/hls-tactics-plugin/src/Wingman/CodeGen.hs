@@ -35,6 +35,7 @@ import           Wingman.Judgements.Theta
 import           Wingman.Machinery
 import           Wingman.Naming
 import           Wingman.Types
+import GHC (EpAnn(..), emptyComments)
 
 
 destructMatches
@@ -99,14 +100,13 @@ destructionFor hy t = do
             args  = conLikeInstOrigArgTys' con apps
             names = mkManyGoodNames (hyNamesInScope hy) args
         pure
-          . noLoc
+          . noLocA
           . Match
-              noExtField
+              EpAnnNotUsed
               CaseAlt
               [toPatCompat $ snd $ mkDestructPat Nothing con names]
-          . GRHSs noExtField (pure $ noLoc $ GRHS noExtField [] $ noLoc $ var "_")
-          . noLoc
-          $ EmptyLocalBinds noExtField
+          . GRHSs emptyComments (pure $ L noSrcSpan $ GRHS EpAnnNotUsed [] $ noLocA $ var "_")
+          $ EmptyLocalBinds NoExtField
 
 
 
@@ -125,17 +125,19 @@ mkDestructPat already_in_scope con names
               case S.member label_occ in_scope of
                 -- We have a shadow, so use the generated name instead
                 True ->
-                  (name,) $ noLoc $
+                  (name,) $ noLocA $
                     HsRecField
-                      (noLoc $ mkFieldOcc $ noLoc $ Unqual label_occ)
-                      (noLoc $ bvar' name)
+                      EpAnnNotUsed
+                      (noLoc $ mkFieldOcc $ noLocA $ Unqual label_occ)
+                      (noLocA $ bvar' name)
                       False
                 -- No shadow, safe to use a pun
                 False ->
-                  (label_occ,) $ noLoc $
+                  (label_occ,) $ noLocA $
                     HsRecField
-                      (noLoc $ mkFieldOcc $ noLoc $ Unqual label_occ)
-                      (noLoc $ bvar' label_occ)
+                      EpAnnNotUsed
+                      (noLoc $ mkFieldOcc $ noLocA $ Unqual label_occ)
+                      (noLocA $ bvar' label_occ)
                       True
 
         in (names', )
@@ -155,7 +157,7 @@ infixifyPatIfNecessary :: ConLike -> Pat GhcPs -> Pat GhcPs
 infixifyPatIfNecessary dcon x
   | conLikeIsInfix dcon =
       case x of
-        ConPatIn op (PrefixCon [lhs, rhs]) ->
+        ConPatIn op (PrefixCon _ [lhs, rhs]) ->
           ConPatIn op $ InfixCon lhs rhs
         y -> y
   | otherwise = x
@@ -218,7 +220,7 @@ destruct' use_field_puns f hi jdg = do
            $ disallowing AlreadyDestructed (S.singleton term) jdg
   pure $ ext
     & #syn_trace     %~ rose ("destruct " <> show term) . pure
-    & #syn_val       %~ noLoc . case' (var' term)
+    & #syn_val       %~ noLocA . case' (var' term)
 
 
 ------------------------------------------------------------------------------
@@ -234,7 +236,7 @@ destructLambdaCase' use_field_puns f jdg = do
 #else
     Just (arg, _) | isAlgType arg ->
 #endif
-      fmap (fmap noLoc lambdaCase) <$>
+      fmap (fmap noLocA lambdaCase) <$>
         destructMatches use_field_puns f Nothing (CType arg) jdg
     _ -> cut -- throwError $ GoalMismatch "destructLambdaCase'" g
 
@@ -283,8 +285,8 @@ buildDataCon should_blacklist jdg dc tyapps = do
 mkApply :: OccName -> [HsExpr GhcPs] -> LHsExpr GhcPs
 mkApply occ (lhs : rhs : more)
   | isSymOcc occ
-  = noLoc $ foldl' (@@) (op lhs (coerceName occ) rhs) more
-mkApply occ args = noLoc $ foldl' (@@) (var' occ) args
+  = noLocA $ foldl' (@@) (op lhs (coerceName occ) rhs) more
+mkApply occ args = noLocA $ foldl' (@@) (var' occ) args
 
 
 ------------------------------------------------------------------------------
@@ -310,7 +312,7 @@ letForEach rename solve (unHypothesis -> hy) jdg = do
       let hy' = fmap (g <$) $ syn_val terms
           matches = fmap (fmap (\(occ, expr) -> valBind (occNameToStr occ) expr)) terms
       g <- fmap (fmap unLoc) $ newSubgoal $ introduce ctx (userHypothesis hy') jdg
-      pure $ fmap noLoc $ let' <$> matches <*> g
+      pure $ fmap noLocA $ let' <$> matches <*> g
 
 
 ------------------------------------------------------------------------------
@@ -324,7 +326,7 @@ nonrecLet occjdgs jdg = do
   ctx     <- ask
   ext     <- newSubgoal
            $ introduce ctx (userHypothesis $ fmap (second jGoal) occjdgs) jdg
-  pure $ fmap noLoc $
+  pure $ fmap noLocA $
     let'
       <$> traverse
             (\(occ, ext) -> valBind (occNameToStr occ) <$> fmap unLoc ext)
@@ -335,12 +337,12 @@ nonrecLet occjdgs jdg = do
 ------------------------------------------------------------------------------
 -- | Converts a function application into applicative form
 idiomize :: LHsExpr GhcPs -> LHsExpr GhcPs
-idiomize x = noLoc $ case unLoc x of
+idiomize x = noLocA $ case unLoc x of
   HsApp _ (L _ (HsVar _ (L _ x))) gshgp3 ->
     op (bvar' $ occName x) "<$>" (unLoc gshgp3)
   HsApp _ gsigp gshgp3 ->
     op (unLoc $ idiomize gsigp) "<*>" (unLoc gshgp3)
-  RecordCon _ con flds ->
-    unLoc $ idiomize $ noLoc $ foldl' (@@) (HsVar noExtField con) $ fmap unLoc flds
+  RecordCon _ con (HsRecFields flds _) ->
+    unLoc $ idiomize $ noLocA $ foldl' (@@) (HsVar noExtField con) $ fmap (unLoc . hsRecFieldArg . unLoc) flds
   y -> y
 
