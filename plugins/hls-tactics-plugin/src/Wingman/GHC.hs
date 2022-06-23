@@ -24,6 +24,7 @@ import           Wingman.Types
 
 #if __GLASGOW_HASKELL__ >= 900
 import GHC.Tc.Utils.TcType
+import GHC (SrcSpanAnnA)
 #endif
 
 
@@ -220,16 +221,14 @@ pattern Lambda pats body <-
 ------------------------------------------------------------------------------
 -- | A GRHS that caontains no guards.
 pattern UnguardedRHSs
-  :: (XRec p (LHsExpr p) ~ GenLocated l (GRHS p (LHsExpr p)),
-      XRec p (HsExpr p) ~ GenLocated l (HsExpr p))
-  => LHsExpr p -> GenLocated l (RHSs p (LHsExpr p))
+  :: LHsExpr GhcPs -> (GRHSs GhcPs (LHsExpr GhcPs))
 pattern UnguardedRHSs body <-
   GRHSs {grhssGRHSs = [L _ (GRHS _ [] body)]}
 
 
 ------------------------------------------------------------------------------
 -- | A match with a single pattern. Case matches are always 'SinglePatMatch'es.
-pattern SinglePatMatch :: PatCompattable p => Pat p -> LHsExpr p -> Match p (LHsExpr p)
+pattern SinglePatMatch :: Pat GhcPs -> LHsExpr GhcPs -> Match GhcPs (LHsExpr GhcPs)
 pattern SinglePatMatch pat body <-
   Match { m_pats = [fromPatCompat -> pat]
         , m_grhss = UnguardedRHSs body
@@ -238,7 +237,7 @@ pattern SinglePatMatch pat body <-
 
 ------------------------------------------------------------------------------
 -- | Helper function for defining the 'Case' pattern.
-unpackMatches :: PatCompattable p => [Match p (LHsExpr p)] -> Maybe [(Pat p, LHsExpr p)]
+unpackMatches :: [Match GhcPs (LHsExpr GhcPs)] -> Maybe [(Pat GhcPs, LHsExpr GhcPs)]
 unpackMatches [] = Just []
 unpackMatches (SinglePatMatch pat body : matches) =
   ((pat, body):) <$> unpackMatches matches
@@ -247,14 +246,14 @@ unpackMatches _ = Nothing
 
 ------------------------------------------------------------------------------
 -- | A pattern over the otherwise (extremely) messy AST for lambdas.
-pattern Case :: PatCompattable p => HsExpr p -> [(Pat p, LHsExpr p)] -> HsExpr p
+pattern Case :: HsExpr GhcPs -> [(Pat GhcPs, LHsExpr GhcPs)] -> HsExpr GhcPs
 pattern Case scrutinee matches <-
   HsCase _ (L _ scrutinee)
     MG {mg_alts = L _ (fmap unLoc -> unpackMatches -> Just matches)}
 
 ------------------------------------------------------------------------------
 -- | Like 'Case', but for lambda cases.
-pattern LamCase :: PatCompattable p => [(Pat p, LHsExpr p)] -> HsExpr p
+pattern LamCase :: [(Pat GhcPs, LHsExpr GhcPs)] -> HsExpr GhcPs
 pattern LamCase matches <-
   HsLamCase _
     MG {mg_alts = L _ (fmap unLoc -> unpackMatches -> Just matches)}
@@ -291,6 +290,17 @@ instance PatCompattable GhcPs where
 
 type PatCompat pass = Pat pass
 #else
+#if MIN_VERSION_ghc(9,2,2)
+instance PatCompattable GhcTc where
+  fromPatCompat = unLoc
+  toPatCompat = noLocA
+
+instance PatCompattable GhcPs where
+  fromPatCompat = unLoc
+  toPatCompat = noLocA
+
+type PatCompat pass = LPat pass
+#else
 instance PatCompattable GhcTc where
   fromPatCompat = unLoc
   toPatCompat = noLoc
@@ -300,6 +310,7 @@ instance PatCompattable GhcPs where
   toPatCompat = noLoc
 
 type PatCompat pass = LPat pass
+#endif
 #endif
 
 ------------------------------------------------------------------------------
@@ -315,7 +326,7 @@ pattern TopLevelRHS name ps body where_binds <-
     (FunRhs (L _ (occName -> name)) _ _)
     ps
     (GRHSs _
-      [L _ (GRHS _ [] body)] (L _ where_binds))
+      [L _ (GRHS _ [] body)] where_binds)
 
 ------------------------------------------------------------------------------
 -- | In GHC 8.8, sometimes patterns are wrapped in 'XPat'.
@@ -369,11 +380,11 @@ tryUnifyUnivarsButNotSkolems skolems goal inst =
 -- | Like 'tryUnifyUnivarsButNotSkolems', but takes a list
 -- of pairs of types to unify.
 tryUnifyUnivarsButNotSkolemsMany :: Set TyVar -> [(Type, Type)] -> Maybe TCvSubst
-tryUnifyUnivarsButNotSkolemsMany skolems (unzip -> (goal, inst)) =
-  tcUnifyTys
-    (bool BindMe Skolem . flip S.member skolems)
-    inst
-    goal
+tryUnifyUnivarsButNotSkolemsMany skolems (unzip -> (goal, inst)) = undefined
+  -- tcUnifyTys
+  --   (bool BindMe (Skolem _) . flip S.member skolems)
+  --   inst
+  --   goal
 
 
 updateSubst :: TCvSubst -> TacticState -> TacticState

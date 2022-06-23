@@ -9,7 +9,7 @@ module Wingman.StaticPlugin
   ) where
 
 import Development.IDE.GHC.Compat
-import Development.IDE.GHC.Compat.Util
+import Development.IDE.GHC.Compat.Util ( FastString )
 import GHC.LanguageExtensions.Type (Extension(EmptyCase, QuasiQuotes))
 
 import Ide.Types
