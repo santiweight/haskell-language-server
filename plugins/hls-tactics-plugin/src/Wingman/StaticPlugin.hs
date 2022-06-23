@@ -14,17 +14,21 @@ import GHC.LanguageExtensions.Type (Extension(EmptyCase, QuasiQuotes))
 
 import Ide.Types
 
+#if MIN_VERSION_ghc(9,2,0)
+import GHC.Parser.Annotation
+#endif
 #if __GLASGOW_HASKELL__ >= 808
 import Data.Data
 import Generics.SYB
 #if __GLASGOW_HASKELL__ >= 900
 import GHC.Driver.Plugins (purePlugin)
+import GHC (EpAnn(EpAnnNotUsed))
 #else
 import Plugins (purePlugin)
 #endif
 #endif
 
-staticPlugin :: DynFlagsModifications
+staticPlugin :: GhcOptsModifications
 staticPlugin = mempty
   { dynFlagsModifyGlobal =
       \df -> allowEmptyCaseButWithWarning
@@ -34,12 +38,20 @@ staticPlugin = mempty
              { refLevelHoleFits = Just 0
              , maxRefHoleFits   = Just 0
              , maxValidHoleFits = Just 0
+#if MIN_VERSION_ghc(9,2,0)
+#else
 #if __GLASGOW_HASKELL__ >= 808
              , staticPlugins = staticPlugins df <> [metaprogrammingPlugin]
+#endif
 #endif
              }
 #if __GLASGOW_HASKELL__ >= 808
   , dynFlagsModifyParser = enableQuasiQuotes
+#endif
+#if MIN_VERSION_ghc(9,2,0)
+  , staticPlugins = [metaprogrammingPlugin]
+#else
+  , staticPlugins = []
 #endif
   }
 
@@ -48,10 +60,10 @@ pattern MetaprogramSourceText :: SourceText
 pattern MetaprogramSourceText = SourceText "wingman-meta-program"
 
 
-pattern WingmanMetaprogram :: FastString -> HsExpr p
+pattern WingmanMetaprogram :: (XRec p (HsExpr p) ~ GenLocated l (HsExpr p)) => FastString -> HsExpr p
 pattern WingmanMetaprogram mp <-
 #if __GLASGOW_HASKELL__ >= 900
-  HsPragE _ (HsPragSCC _ MetaprogramSourceText (StringLiteral NoSourceText mp))
+  HsPragE _ (HsPragSCC _ MetaprogramSourceText (StringLiteral NoSourceText mp Nothing))
       (L _ ( HsVar _ _))
 #else
   HsSCC _ MetaprogramSourceText (StringLiteral NoSourceText mp)
@@ -85,15 +97,32 @@ metaprogrammingPlugin =
 
 mkMetaprogram :: SrcSpan -> FastString -> HsExpr GhcPs
 mkMetaprogram ss mp =
-#if __GLASGOW_HASKELL__ >= 900
-  HsPragE noExtField (HsPragSCC noExtField MetaprogramSourceText (StringLiteral NoSourceText mp))
+#if MIN_VERSION_ghc(9,2,0)
+  HsPragE noExtField (HsPragSCC EpAnnNotUsed MetaprogramSourceText (StringLiteral NoSourceText mp Nothing))
+    $ L (SrcSpanAnn EpAnnNotUsed ss)
+    $ HsVar noExtField
+    $ L (SrcSpanAnn EpAnnNotUsed ss)
+    $ mkRdrUnqual metaprogramHoleName
+addMetaprogrammingSyntax :: Data a => a -> a
+addMetaprogrammingSyntax =
+  everywhere $ mkT $ \case
+    L ss (MetaprogramSyntax mp) ->
+      L ss $ mkMetaprogram ss mp
+    (x :: GenLocated SrcSpan (HsExpr GhcPs)) -> x
 #else
-  HsSCC noExtField MetaprogramSourceText (StringLiteral NoSourceText mp)
-#endif
+#if __GLASGOW_HASKELL__ >= 900
+  HsPragE noExtField (HsPragSCC EpAnnNotUsed MetaprogramSourceText (StringLiteral NoSourceText mp Nothing))
     $ L ss
     $ HsVar noExtField
     $ L ss
     $ mkRdrUnqual metaprogramHoleName
+#else
+  HsSCC noExtField MetaprogramSourceText (StringLiteral NoSourceText mp)
+    $ L ss
+    $ HsVar noExtField
+    $ L ss
+    $ mkRdrUnqual metaprogramHoleName
+#endif
 
 addMetaprogrammingSyntax :: Data a => a -> a
 addMetaprogrammingSyntax =
@@ -101,6 +130,7 @@ addMetaprogrammingSyntax =
     L ss (MetaprogramSyntax mp) ->
       L ss $ mkMetaprogram ss mp
     (x :: LHsExpr GhcPs) -> x
+#endif
 #endif
 
 metaprogramHoleName :: OccName
@@ -111,7 +141,7 @@ pattern MetaprogramSyntax mp <-
     HsSpliceE _ (HsQuasiQuote _ _ (occNameString . rdrNameOcc -> "wingman") _ mp)
   where
     MetaprogramSyntax mp =
-      HsSpliceE noExtField $
+      HsSpliceE EpAnnNotUsed $
         HsQuasiQuote
           noExtField
           (mkRdrUnqual $ mkVarOcc "splice")

@@ -79,7 +79,7 @@ tacticsThetaTy (tcSplitSigmaTy -> (_, theta,  _)) = theta
 -- | Get the data cons of a type, if it has any.
 tacticsGetDataCons :: Type -> Maybe ([DataCon], [Type])
 tacticsGetDataCons ty
-  | Just (_, ty') <- tcSplitForAllTyVarBinder_maybe ty
+  | Just (_, ty') <- GHC.Tc.Utils.TcType.tcSplitForAllTyVarBinder_maybe ty
   = tacticsGetDataCons ty'
 tacticsGetDataCons ty
   | Just _ <- algebraicTyCon ty
@@ -102,7 +102,7 @@ freshTyvars t = do
   pure $
     everywhere
       (mkT $ \tv -> M.findWithDefault tv tv reps
-      ) $ snd $ tcSplitForAllTyVars t
+      ) $ snd $ GHC.Tc.Utils.TcType.tcSplitForAllTyVars t
 
 
 ------------------------------------------------------------------------------
@@ -121,7 +121,7 @@ getRecordFields dc =
 -- | Is this an algebraic type?
 algebraicTyCon :: Type -> Maybe TyCon
 algebraicTyCon ty
-  | Just (_, ty') <- tcSplitForAllTyVarBinder_maybe ty
+  | Just (_, ty') <- GHC.Tc.Utils.TcType.tcSplitForAllTyVarBinder_maybe ty
   = algebraicTyCon ty'
 algebraicTyCon (splitTyConApp_maybe -> Just (tycon, _))
   | tycon == intTyCon    = Nothing
@@ -219,7 +219,10 @@ pattern Lambda pats body <-
 
 ------------------------------------------------------------------------------
 -- | A GRHS that caontains no guards.
-pattern UnguardedRHSs :: LHsExpr p -> GRHSs p (LHsExpr p)
+pattern UnguardedRHSs
+  :: (XRec p (LHsExpr p) ~ GenLocated l (GRHS p (LHsExpr p)),
+      XRec p (HsExpr p) ~ GenLocated l (HsExpr p))
+  => LHsExpr p -> GenLocated l (RHSs p (LHsExpr p))
 pattern UnguardedRHSs body <-
   GRHSs {grhssGRHSs = [L _ (GRHS _ [] body)]}
 

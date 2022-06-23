@@ -42,6 +42,7 @@ import           Refinery.Tactic.Internal (TacticT(TacticT), RuleT (RuleT))
 import           System.IO.Unsafe (unsafePerformIO)
 import           Wingman.Debug
 import           Data.IORef
+import GHC.Parser.Annotation (SrcSpanAnnA)
 
 
 ------------------------------------------------------------------------------
@@ -145,8 +146,8 @@ instance Show (HsDecl GhcPs) where
 instance Show (Pat GhcPs) where
   show  = unsafeRender
 
-instance Show (LHsSigType GhcPs) where
-  show  = unsafeRender
+-- instance Show (LHsSigType GhcPs) where
+--   show  = unsafeRender
 
 instance Show TyCon where
   show  = unsafeRender
@@ -319,16 +320,16 @@ globalHoleRef :: IORef Int
 globalHoleRef = unsafePerformIO $ newIORef 10
 {-# NOINLINE globalHoleRef #-}
 
-instance MonadExtract Int (Synthesized (LHsExpr GhcPs)) TacticError TacticState ExtractM where
-  hole = do
-    u <- lift $ ExtractM $ lift $
-          readIORef globalHoleRef <* modifyIORef' globalHoleRef (+ 1)
-    pure
-      ( u
-      , pure . noLoc $ var $ fromString $ occNameString $ occName $ mkMetaHoleName u
-      )
+-- instance MonadExtract Int (Synthesized (LHsExpr GhcPs)) TacticError TacticState ExtractM where
+--   hole = do
+--     u <- lift $ ExtractM $ lift $
+--           readIORef globalHoleRef <* modifyIORef' globalHoleRef (+ 1)
+--     pure
+--       ( u
+--       , pure . noLoc $ var $ fromString $ occNameString $ occName $ mkMetaHoleName u
+--       )
 
-  unsolvableHole _ = hole
+--   unsolvableHole _ = hole
 
 
 instance MonadReader r m => MonadReader r (TacticT jdg ext err s m) where
@@ -343,13 +344,13 @@ instance MonadReader r m => MonadReader r (RuleT jdg ext err s m) where
 mkMetaHoleName :: Int -> RdrName
 mkMetaHoleName u = mkRdrUnqual $ mkVarOcc $ "_" <> show (Util.mkUnique 'w' u)
 
-instance MetaSubst Int (Synthesized (LHsExpr GhcPs)) where
-  -- TODO(sandy): This join is to combine the synthesizeds
-  substMeta u val a =  join $ a <&>
-    everywhereM (mkM $ \case
-      (L _ (HsVar _ (L _ name)))
-        | name == mkMetaHoleName u -> val
-      (t :: LHsExpr GhcPs) -> pure t)
+-- instance MetaSubst Int (Synthesized (LHsExpr GhcPs)) where
+--   -- TODO(sandy): This join is to combine the synthesizeds
+--   substMeta u val a =  join $ a <&>
+--     everywhereM (mkM $ \case
+--       (L _ (HsVar _ (L _ name)))
+--         | name == mkMetaHoleName u -> val
+--       (t :: LHsExpr GhcPs) -> pure t)
 
 
 ------------------------------------------------------------------------------
@@ -525,6 +526,8 @@ data RunTacticResults = RunTacticResults
   , rtr_timed_out   :: Bool
   } deriving Show
 
+instance Show (GenLocated SrcSpanAnnA (HsExpr GhcPs)) where
+  show = unsafeRender
 
 data AgdaMatch = AgdaMatch
   { amPats :: [Pat GhcPs]
