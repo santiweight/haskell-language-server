@@ -1,6 +1,6 @@
 cabal-version:      2.4
 category:           Development
-name:               hls-refine-destruct-plugin
+name:               hls-tactics-plugin
 version:            1.7.0.0
 synopsis:           Wingman plugin for Haskell Language Server
 description:
@@ -159,7 +159,7 @@ test-suite tests
     , ghc
     , ghcide
     , hls-plugin-api
-    , hls-refine-destruct-plugin
+    , hls-tactics-plugin
     , hls-test-utils      ^>=1.4
     , hspec
     , hspec-expectations

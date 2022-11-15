@@ -19,7 +19,7 @@ import Development.IDE.Types.Options (IdeTesting(IdeTesting), IdeOptions (IdeOpt
 import Generics.SYB.GHC (mkBindListT, everywhereM')
 import Wingman.AbstractLSP.Types
 import Wingman.CaseSplit
-import Wingman.GHC (liftMaybe, isHole, pattern AMatch, unXPat)
+import Wingman.GHC (liftMaybe, isHole, pattern AMatch)
 import Wingman.Judgements (jNeedsToBindArgs)
 import Wingman.LanguageServer (runStaleIde)
 import Wingman.LanguageServer.TacticProviders
