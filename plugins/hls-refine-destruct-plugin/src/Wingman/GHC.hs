@@ -216,7 +216,7 @@ pattern Lambda pats body <-
 
 
 ------------------------------------------------------------------------------
--- | A GRHS that caontains no guards.
+-- | A GRHS that contains no guards.
 pattern UnguardedRHSs :: LHsExpr p -> GRHSs p (LHsExpr p)
 pattern UnguardedRHSs body <-
   GRHSs {grhssGRHSs = [L _ (GRHS _ [] body)]}
@@ -275,17 +275,6 @@ class PatCompattable p where
   fromPatCompat :: PatCompat p -> Pat p
   toPatCompat :: Pat p -> PatCompat p
 
-#if __GLASGOW_HASKELL__ == 808
-instance PatCompattable GhcTc where
-  fromPatCompat = id
-  toPatCompat = id
-
-instance PatCompattable GhcPs where
-  fromPatCompat = id
-  toPatCompat = id
-
-type PatCompat pass = Pat pass
-#else
 instance PatCompattable GhcTc where
   fromPatCompat = unLoc
   toPatCompat = noLoc
@@ -295,7 +284,6 @@ instance PatCompattable GhcPs where
   toPatCompat = noLoc
 
 type PatCompat pass = LPat pass
-#endif
 
 ------------------------------------------------------------------------------
 -- | Should make sure it's a fun bind
@@ -311,19 +299,6 @@ pattern TopLevelRHS name ps body where_binds <-
     ps
     (GRHSs _
       [L _ (GRHS _ [] body)] (L _ where_binds))
-
-------------------------------------------------------------------------------
--- | In GHC 8.8, sometimes patterns are wrapped in 'XPat'.
--- The nitty gritty details are explained at
--- https://blog.shaynefletcher.org/2020/03/ghc-haskell-pats-and-lpats.html
---
--- We need to remove these in order to succesfull find patterns.
-unXPat :: Pat GhcPs -> Pat GhcPs
-#if __GLASGOW_HASKELL__ == 808
-unXPat (XPat (L _ pat)) = unXPat pat
-#endif
-unXPat pat              = pat
-
 
 liftMaybe :: Monad m => Maybe a -> MaybeT m a
 liftMaybe a = MaybeT $ pure a

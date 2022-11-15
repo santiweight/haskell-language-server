@@ -30,6 +30,7 @@ import qualified Development.IDE.Core.Shake as IDE
 import qualified Development.IDE.Core.Shake as Shake
 import           Development.IDE.Core.UseStale
 import           Development.IDE.GHC.Compat hiding (empty)
+import           Development.IDE.GHC.Compat.ExactPrint
 import qualified Development.IDE.GHC.Compat.Util as FastString
 import           Development.IDE.GHC.Error (realSrcSpanToRange)
 import           Development.IDE.GHC.ExactPrint hiding (LogShake, Log)
@@ -375,12 +376,7 @@ buildPatHy prov (fromPatCompat -> p0) =
           mkDerivedConHypothesis prov con args $ zip [0..] [pgt, pgt5]
         RecCon r ->
           mkDerivedRecordHypothesis prov con args r
-#if __GLASGOW_HASKELL__ >= 808
     SigPat  _ p _ -> buildPatHy prov p
-#endif
-#if __GLASGOW_HASKELL__ == 808
-    XPat   p      -> buildPatHy prov $ unLoc p
-#endif
     _             -> pure mempty
 
 
@@ -416,7 +412,7 @@ mkFakeVar = do
 
 
 ------------------------------------------------------------------------------
--- | Construct a fake varible to attach the current 'Provenance' to, and then
+-- | Construct a fake variable to attach the current 'Provenance' to, and then
 -- build a sub-hypothesis for the pattern match.
 mkDerivedConHypothesis
     :: Provenance
@@ -527,10 +523,6 @@ wingmanRules recorder plId = do
 #endif
                         | isHole occ ->
                             maybeToList $ srcSpanToRange span
-#if __GLASGOW_HASKELL__ <= 808
-                      L span (EWildPat _) ->
-                        maybeToList $ srcSpanToRange span
-#endif
                       (_ :: LHsExpr GhcPs) -> mempty
                     ) $ pm_parsed_source pm
             pure
