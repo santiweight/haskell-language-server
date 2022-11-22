@@ -60,6 +60,7 @@ import           Control.Applicative                      (liftA2)
 import qualified Development.IDE.Plugin.CodeAction        as Refactor
 import qualified Development.IDE.Plugin.HLS.GhcIde        as GhcIde
 import qualified Test.AddArgument
+import qualified Test.DefineNotInScope
 
 main :: IO ()
 main = defaultTestRunner tests
@@ -322,6 +323,7 @@ codeActionTests = testGroup "code actions"
   , removeExportTests
 #if MIN_VERSION_ghc(9,2,1)
   , Test.AddArgument.tests
+  , Test.DefineNotInScope.tests
 #endif
   ]
 

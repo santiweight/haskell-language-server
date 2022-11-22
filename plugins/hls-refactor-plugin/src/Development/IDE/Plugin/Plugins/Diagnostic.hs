@@ -4,12 +4,17 @@ module Development.IDE.Plugin.Plugins.Diagnostic (
   unifySpaces,
   matchFoundHole,
   matchFoundHoleIncludeUnderscore,
+  NotInScope(..),
+  canUseIdent,
+  notInScope,
+  extractNotInScopeName,
   )
   where
 
 import           Data.Bifunctor  (Bifunctor (..))
 import qualified Data.Text       as T
 import           Text.Regex.TDFA ((=~~))
+import Development.IDE.Types.Exports (IdentInfo(..))
 
 unifySpaces :: T.Text -> T.Text
 unifySpaces    = T.unwords . T.words
@@ -51,3 +56,37 @@ matchVariableNotInScope message
       | Just [name] <- matchRegexUnifySpaces message "Variable not in scope: ([^ ]+)" =
           Just name
       | otherwise = Nothing
+
+data NotInScope
+    = NotInScopeDataConstructor T.Text
+    | NotInScopeTypeConstructorOrClass T.Text
+    | NotInScopeThing T.Text
+    deriving Show
+
+canUseIdent :: NotInScope -> IdentInfo -> Bool
+canUseIdent NotInScopeDataConstructor{}        = isDatacon
+canUseIdent NotInScopeTypeConstructorOrClass{} = not . isDatacon
+canUseIdent _                                  = const True
+
+notInScope :: NotInScope -> T.Text
+notInScope (NotInScopeDataConstructor t)        = t
+notInScope (NotInScopeTypeConstructorOrClass t) = t
+notInScope (NotInScopeThing t)                  = t
+
+extractNotInScopeName :: T.Text -> Maybe NotInScope
+extractNotInScopeName x
+  | Just [name] <- matchRegexUnifySpaces x "Data constructor not in scope: ([^ ]+)"
+  = Just $ NotInScopeDataConstructor name
+  | Just [name] <- matchRegexUnifySpaces x "Not in scope: data constructor [^‘]*‘([^’]*)’"
+  = Just $ NotInScopeDataConstructor name
+  | Just [name] <- matchRegexUnifySpaces x "ot in scope: type constructor or class [^‘]*‘([^’]*)’"
+  = Just $ NotInScopeTypeConstructorOrClass name
+  | Just [name] <- matchRegexUnifySpaces x "ot in scope: \\(([^‘ ]+)\\)"
+  = Just $ NotInScopeThing name
+  | Just [name] <- matchRegexUnifySpaces x "ot in scope: ([^‘ ]+)"
+  = Just $ NotInScopeThing name
+  | Just [name] <- matchRegexUnifySpaces x "ot in scope:[^‘]*‘([^’]*)’"
+  = Just $ NotInScopeThing name
+  | otherwise
+  = Nothing
+

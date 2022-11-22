@@ -105,6 +105,7 @@ import           GHC                                               (AddEpAnn (Ad
                                                                     EpaLocation (..),
                                                                     LEpaComment,
                                                                     LocatedA)
+import qualified Development.IDE.Plugin.Plugins.DefineNotInScope
 #else
 import           Language.Haskell.GHC.ExactPrint.Types             (Annotation (annsDP),
                                                                     DeltaPos,
@@ -175,6 +176,7 @@ bindingsPluginDescriptor recorder plId = mkExactprintPluginDescriptor recorder $
 #endif
     , wrap suggestNewDefinition
     , wrap Development.IDE.Plugin.Plugins.AddArgument.plugin
+    , wrap Development.IDE.Plugin.Plugins.DefineNotInScope.plugin
     , wrap suggestDeleteUnusedBinding
     ]
     plId
@@ -1667,39 +1669,6 @@ newImportAll modName = newImport modName Nothing Nothing False
 
 hideImplicitPreludeSymbol :: T.Text -> NewImport
 hideImplicitPreludeSymbol symbol = newUnqualImport "Prelude" symbol True
-
-canUseIdent :: NotInScope -> IdentInfo -> Bool
-canUseIdent NotInScopeDataConstructor{}        = isDatacon
-canUseIdent NotInScopeTypeConstructorOrClass{} = not . isDatacon
-canUseIdent _                                  = const True
-
-data NotInScope
-    = NotInScopeDataConstructor T.Text
-    | NotInScopeTypeConstructorOrClass T.Text
-    | NotInScopeThing T.Text
-    deriving Show
-
-notInScope :: NotInScope -> T.Text
-notInScope (NotInScopeDataConstructor t)        = t
-notInScope (NotInScopeTypeConstructorOrClass t) = t
-notInScope (NotInScopeThing t)                  = t
-
-extractNotInScopeName :: T.Text -> Maybe NotInScope
-extractNotInScopeName x
-  | Just [name] <- matchRegexUnifySpaces x "Data constructor not in scope: ([^ ]+)"
-  = Just $ NotInScopeDataConstructor name
-  | Just [name] <- matchRegexUnifySpaces x "Not in scope: data constructor [^‘]*‘([^’]*)’"
-  = Just $ NotInScopeDataConstructor name
-  | Just [name] <- matchRegexUnifySpaces x "ot in scope: type constructor or class [^‘]*‘([^’]*)’"
-  = Just $ NotInScopeTypeConstructorOrClass name
-  | Just [name] <- matchRegexUnifySpaces x "ot in scope: \\(([^‘ ]+)\\)"
-  = Just $ NotInScopeThing name
-  | Just [name] <- matchRegexUnifySpaces x "ot in scope: ([^‘ ]+)"
-  = Just $ NotInScopeThing name
-  | Just [name] <- matchRegexUnifySpaces x "ot in scope:[^‘]*‘([^’]*)’"
-  = Just $ NotInScopeThing name
-  | otherwise
-  = Nothing
 
 extractQualifiedModuleName :: T.Text -> Maybe T.Text
 extractQualifiedModuleName x
