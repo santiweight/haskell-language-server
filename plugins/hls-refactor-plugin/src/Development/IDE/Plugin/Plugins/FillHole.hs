@@ -36,7 +36,7 @@ suggestFillHole Diagnostic{_range=_range,..}
       getOperatorNotation True True name                     = T.drop 1 (T.dropEnd 1 name)
       getOperatorNotation _isInfixHole _isInfixOperator name = name
       headOrThrow msg = \case
-        [] -> error msg
+        []    -> error msg
         (x:_) -> x
 
 processHoleSuggestions :: [T.Text] -> ([T.Text], [T.Text])
